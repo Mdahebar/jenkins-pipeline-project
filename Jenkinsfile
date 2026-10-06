@@ -3,28 +3,24 @@ pipeline {
 
     environment {
         APP_NAME = 'DevOps-Core-App'
+        APP_VERSION = '2.0.0'
     }
 
     stages {
         stage('Checkout & Verify') {
             steps {
                 echo "=== Step 1: Code fetched via SCM ==="
-                sh '''
-                    echo "Current directory:"
-                    pwd
-                    echo "Cloned repository files:"
-                    ls -la
-                '''
+                sh 'ls -la'
             }
         }
 
         stage('Build Simulation') {
             steps {
-                echo "=== Step 2: Building ${env.APP_NAME} ==="
+                echo "=== Step 2: Building ${env.APP_NAME} version ${env.APP_VERSION} ==="
                 sh '''
-                    echo "Compiling application binaries..."
                     mkdir -p dist
-                    echo "App Version: 1.0.0" > dist/app.info
+                    echo "App Name: ${APP_NAME}" > dist/app.info
+                    echo "Release Version: ${APP_VERSION}" >> dist/app.info
                     cat dist/app.info
                 '''
             }
@@ -34,23 +30,26 @@ pipeline {
             steps {
                 echo "=== Step 3: Running automated validation ==="
                 sh '''
-                    if [ -d dist ]; then
-                        echo "Build directory exists! Validation Passed."
+                    if [ -f dist/app.info ]; then
+                        echo "File verification passed!"
                     else
-                        echo "Build failed!"
                         exit 1
                     fi
                 '''
             }
         }
+
+        stage('Archive Artifacts') {
+            steps {
+                echo "=== Step 4: Archiving output file ==="
+                archiveArtifacts artifacts: 'dist/*.info', fingerprint: true
+            }
+        }
     }
 
     post {
-        always {
-            echo "Pipeline run completed."
-        }
         success {
-            echo "Success: SCM Pipeline executed flawlessly!"
+            echo "Success: Release ${env.APP_VERSION} built and archived!"
         }
     }
 }
