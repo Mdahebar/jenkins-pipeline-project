@@ -4,8 +4,9 @@ pipeline {
     environment {
         APP_NAME    = 'DevOps-Core-App'
         IMAGE_NAME  = 'devops-app'
-        // APNA DOCKER HUB USERNAME YAHAN LIKHEIN (e.g., 'mdahebar')
-        DOCKER_REPO = 'YOUR_DOCKERHUB_USERNAME'
+        // YAHAN apna asli Docker Hub username likhein (sirf small letters me)
+        DOCKER_REPO = 'your_actual_username' 
+    }
     }
 
     stages {
