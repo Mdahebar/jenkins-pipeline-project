@@ -2,8 +2,9 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = 'DevOps-Core-App'
-        APP_VERSION = '2.0.0'
+        APP_NAME    = 'DevOps-Core-App'
+        APP_VERSION = '2.1.0'
+        IMAGE_NAME  = 'devops-app'
     }
 
     stages {
@@ -14,43 +15,41 @@ pipeline {
             }
         }
 
-        stage('Build Simulation') {
+        stage('Docker Build') {
             steps {
-                echo "=== Step 2: Building ${env.APP_NAME} version ${env.APP_VERSION} ==="
-                sh '''
-                    mkdir -p dist
-                    echo "App Name: ${APP_NAME}" > dist/app.info
-                    echo "Release Version: ${APP_VERSION}" >> dist/app.info
-                    cat dist/app.info
-                '''
+                echo "=== Step 2: Building Docker Image for Build #${env.BUILD_NUMBER} ==="
+                // Current directory (.) se Dockerfile read karke image build karega
+                sh "docker build -t ${env.IMAGE_NAME}:${env.BUILD_NUMBER} ."
             }
         }
 
-        stage('Unit Testing') {
+        stage('Docker Test & Validate') {
             steps {
-                echo "=== Step 3: Running automated validation ==="
-                sh '''
-                    if [ -f dist/app.info ]; then
-                        echo "File verification passed!"
-                    else
-                        exit 1
-                    fi
-                '''
-            }
-        }
-
-        stage('Archive Artifacts') {
-            steps {
-                echo "=== Step 4: Archiving output file ==="
-                archiveArtifacts artifacts: 'dist/*.info', fingerprint: true
+                echo "=== Step 3: Running Container & Validating Response ==="
+                // Background me container run karega aur host port 8081 ko map karega
+                sh "docker run -d -p 8081:80 --name test-container ${env.IMAGE_NAME}:${env.BUILD_NUMBER}"
+                
+                // 3 second wait taaki Nginx process ready ho jaye
+                sh "sleep 3"
+                
+                // Verification: check if web server returns our custom HTML
+                sh "curl -s http://localhost:8081 | grep 'DevOps CI/CD Pipeline'"
+                echo "Container test passed successfully!"
             }
         }
     }
 
     post {
+        always {
+            echo "=== Step 4: Cleanup Testing Container ==="
+            // Har halat me test container ko delete karega taaki port 8081 free ho jaye
+            sh "docker rm -f test-container || true"
+        }
         success {
-            echo "Success: Release ${env.APP_VERSION} built and archived!"
+            echo "Success: Docker image ${env.IMAGE_NAME}:${env.BUILD_NUMBER} built and verified!"
+        }
+        failure {
+            echo "Failure: Docker pipeline failed!"
         }
     }
 }
-
