@@ -4,9 +4,7 @@ pipeline {
     environment {
         APP_NAME    = 'DevOps-Core-App'
         IMAGE_NAME  = 'devops-app'
-        // YAHAN apna asli Docker Hub username likhein (sirf small letters me)
-        DOCKER_REPO = 'your_actual_username' 
-    }
+        DOCKER_REPO = 'your_dockerhub_username'
     }
 
     stages {
@@ -20,7 +18,6 @@ pipeline {
         stage('Docker Build') {
             steps {
                 echo "=== Step 2: Building Docker Image for Build #${env.BUILD_NUMBER} ==="
-                // Docker Hub standard format: username/imagename:tag
                 sh "docker build -t ${env.DOCKER_REPO}/${env.IMAGE_NAME}:${env.BUILD_NUMBER} ."
             }
         }
