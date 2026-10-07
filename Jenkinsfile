@@ -1,11 +1,10 @@
 pipeline {
     agent any
 
-  environment {
+    environment {
         APP_NAME    = 'DevOps-Core-App'
         IMAGE_NAME  = 'devops-app'
         DOCKER_REPO = 'mdahebar'
-    }
     }
 
     stages {
