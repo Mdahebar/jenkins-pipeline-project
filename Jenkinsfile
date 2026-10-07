@@ -1,61 +1,15 @@
-pipeline {
-    agent any
-
-    environment {
-        APP_NAME    = 'DevOps-Core-App'
-        IMAGE_NAME  = 'devops-app'
-        DOCKER_REPO = 'mdahebar'
-    }
-
-    stages {
-        stage('Checkout & Verify') {
+stage('Deploy to Production') {
             steps {
-                echo "=== Step 1: Code fetched via SCM ==="
-                sh 'ls -la'
+                echo "=== Step 5: Deploying Container to Production (Port 80) ==="
+                // 1. Docker Hub se latest image pull karo
+                sh "docker pull ${env.DOCKER_REPO}/${env.IMAGE_NAME}:latest"
+                
+                // 2. Agar purana prod container chal raha hai toh use hatao
+                sh "docker rm -f prod-container || true"
+                
+                // 3. Naya container port 80 par live run karo
+                sh "docker run -d -p 80:80 --name prod-container ${env.DOCKER_REPO}/${env.IMAGE_NAME}:latest"
+                
+                echo "Application successfully deployed to Production!"
             }
         }
-
-        stage('Docker Build') {
-            steps {
-                echo "=== Step 2: Building Docker Image for Build #${env.BUILD_NUMBER} ==="
-                sh "docker build -t ${env.DOCKER_REPO}/${env.IMAGE_NAME}:${env.BUILD_NUMBER} ."
-            }
-        }
-
-        stage('Docker Test & Validate') {
-            steps {
-                echo "=== Step 3: Running Container & Validating Response ==="
-                sh "docker run -d -p 8081:80 --name test-container-${env.BUILD_NUMBER} ${env.DOCKER_REPO}/${env.IMAGE_NAME}:${env.BUILD_NUMBER}"
-                sh "sleep 3"
-                sh "curl -s http://localhost:8081 | grep 'DevOps CI/CD Pipeline'"
-                echo "Container test passed successfully!"
-            }
-        }
-
-        stage('Docker Hub Push') {
-            steps {
-                echo "=== Step 4: Authenticating & Pushing to Docker Hub ==="
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
-                    sh "docker push ${env.DOCKER_REPO}/${env.IMAGE_NAME}:${env.BUILD_NUMBER}"
-                    sh "docker tag ${env.DOCKER_REPO}/${env.IMAGE_NAME}:${env.BUILD_NUMBER} ${env.DOCKER_REPO}/${env.IMAGE_NAME}:latest"
-                    sh "docker push ${env.DOCKER_REPO}/${env.IMAGE_NAME}:latest"
-                    sh "docker logout"
-                }
-            }
-        }
-    }
-
-    post {
-        always {
-            echo "=== Step 5: Cleanup Testing Container ==="
-            sh "docker rm -f test-container-${env.BUILD_NUMBER} || true"
-        }
-        success {
-            echo "Success: Docker image ${env.DOCKER_REPO}/${env.IMAGE_NAME}:${env.BUILD_NUMBER} pushed to Docker Hub!"
-        }
-        failure {
-            echo "Failure: Docker CI/CD pipeline failed!"
-        }
-    }
-}
