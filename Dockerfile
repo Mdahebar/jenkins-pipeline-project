@@ -1,8 +1,3 @@
-# Base image: standard lightweight web server
 FROM nginx:alpine
-
-# Custom HTML page copy karna container ke andar
-RUN echo "<h1>DevOps CI/CD Pipeline - Docker Build v1.0</h1>" > /usr/share/nginx/html/index.html
-
-# Expose port 80
+RUN echo "<h1>DevOps CI/CD Pipeline - Version 2.0 Live!</h1>" > /usr/share/nginx/html/index.html
 EXPOSE 80
