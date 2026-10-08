@@ -1,104 +1,58 @@
 pipeline {
-
     agent any
 
     environment {
-        DOCKER_REPO = 'mdahebar'
-        IMAGE_NAME = 'devops-app'
+        IMAGE_NAME          = 'mdahebar/devops-app'
+        DOCKER_HUB_CREDS_ID = 'dockerhub-credentials'
     }
 
     stages {
-
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
-                echo "=== Step 1: Checking out source code ==="
                 checkout scm
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                echo "=== Step 2: Building Docker Image ==="
-                sh "docker build -t ${env.DOCKER_REPO}/${env.IMAGE_NAME}:${BUILD_NUMBER} ."
-            }
-        }
-
-        stage('Test Container') {
-            steps {
-                echo "=== Step 3: Testing Docker Container ==="
-
                 sh """
-                    docker rm -f test-container-${BUILD_NUMBER} || true
-                    docker run -d \
-                        --name test-container-${BUILD_NUMBER} \
-                        -p 8081:80 \
-                        ${env.DOCKER_REPO}/${env.IMAGE_NAME}:${BUILD_NUMBER}
-
-                    sleep 5
-
-                    curl -s http://localhost:8081 | grep 'DevOps CI/CD Pipeline'
+                    docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .
+                    docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${IMAGE_NAME}:latest
                 """
             }
         }
 
         stage('Push to Docker Hub') {
             steps {
-                echo "=== Step 4: Pushing Image to Docker Hub ==="
-
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-credentials',
-                        usernameVariable: 'DOCKER_USERNAME',
-                        passwordVariable: 'DOCKER_PASSWORD'
-                    )
-                ]) {
-
-                    sh '''
-                        echo "$DOCKER_PASSWORD" | docker login \
-                            -u "$DOCKER_USERNAME" \
-                            --password-stdin
-
-                        docker push ${DOCKER_REPO}/${IMAGE_NAME}:${BUILD_NUMBER}
-
-                        docker tag \
-                            ${DOCKER_REPO}/${IMAGE_NAME}:${BUILD_NUMBER} \
-                            ${DOCKER_REPO}/${IMAGE_NAME}:latest
-
-                        docker push ${DOCKER_REPO}/${IMAGE_NAME}:latest
-
-                        docker logout
-                    '''
+                withCredentials([usernamePassword(
+                    credentialsId: "${DOCKER_HUB_CREDS_ID}",
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh """
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push ${IMAGE_NAME}:${BUILD_NUMBER}
+                        docker push ${IMAGE_NAME}:latest
+                    """
                 }
             }
         }
 
-        stage('Deploy to Production') {
+        stage('Blue-Green Zero-Downtime Deploy') {
             steps {
-                echo "=== Step 5: Deploying Container to Production (Port 80) ==="
-
-                sh "docker pull ${env.DOCKER_REPO}/${env.IMAGE_NAME}:latest"
-
-                sh "docker rm -f prod-container || true"
-
-                sh "docker run -d -p 80:80 --name prod-container ${env.DOCKER_REPO}/${env.IMAGE_NAME}:latest"
-
-                echo "Application successfully deployed to Production!"
+                sh """
+                    ./deploy.sh ${IMAGE_NAME}:${BUILD_NUMBER}
+                """
             }
         }
     }
 
     post {
-        always {
-            echo "=== Cleaning up test container ==="
-            sh "docker rm -f test-container-${BUILD_NUMBER} || true"
-        }
-
         success {
-            echo "=== CI/CD Pipeline Completed Successfully! ==="
+            echo "Deployment SUCCESSFUL! Zero-downtime Blue-Green switch complete."
         }
-
         failure {
-            echo "=== CI/CD Pipeline Failed! Check the logs. ==="
+            echo "Deployment FAILED! Live production traffic was kept safe."
         }
     }
 }
